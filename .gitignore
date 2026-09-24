@@ -1,0 +1,20 @@
+# Секреты: API-ключ OpenRouter
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# ОС
+.DS_Store
+Thumbs.db
