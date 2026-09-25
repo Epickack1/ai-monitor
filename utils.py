@@ -10,6 +10,15 @@ def input_int(prompt: str) -> int:
             print("  Введите число.")
 
 
+def input_int_range(prompt: str, low: int, high: int) -> int:
+    """Запросить целое число от low до high включительно."""
+    while True:
+        value = input_int(prompt)
+        if low <= value <= high:
+            return value
+        print(f"  Введите число от {low} до {high}.")
+
+
 def input_str(prompt: str) -> str:
     """Запросить непустую строку. Пустой ввод не принимается."""
     while True:

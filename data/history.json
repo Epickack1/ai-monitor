@@ -1,0 +1,86 @@
+[
+  {
+    "model_id": "openai/gpt-4o-mini",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "anthropic/claude-opus-5.5",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "deepseek/deepseek-chat",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "meta-llama/llama-3.3-70b-instruct",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "google/gemma-4-31b-it:free",
+    "status": "Доступна",
+    "uptime": null,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "z-ai/glm-5.2:free",
+    "status": "Не найдена",
+    "uptime": null,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "qwen/qwen3.8-27b:free",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "openai/gpt-4o-mini",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "anthropic/claude-opus-5.5",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "deepseek/deepseek-chat",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "meta-llama/llama-3.3-70b-instruct",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "google/gemma-4-31b-it:free",
+    "status": "Доступна",
+    "uptime": null,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "z-ai/glm-5.2:free",
+    "status": "Не найдена",
+    "uptime": null,
+    "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "qwen/qwen3.8-27b:free",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:29"
+  }
+]

@@ -28,6 +28,19 @@ def best_uptime(endpoints: list[dict], field: str) -> float | None:
     return best
 
 
+def current_uptime(endpoints: list[dict] | None) -> float | None:
+    """Текущий аптайм модели.
+
+    Берётся лучший аптайм за 5 минут, а если данных нет — за 30 минут.
+    """
+    if not endpoints:
+        return None
+    uptime = best_uptime(endpoints, "uptime_last_5m")
+    if uptime is None:
+        uptime = best_uptime(endpoints, "uptime_last_30m")
+    return uptime
+
+
 def get_model_status(endpoints: list[dict] | None) -> str:
     """Определить статус модели по списку её провайдеров."""
     if not endpoints:
@@ -37,9 +50,7 @@ def get_model_status(endpoints: list[dict] | None) -> str:
     if working == 0:
         return STATUS_DOWN
 
-    uptime = best_uptime(endpoints, "uptime_last_5m")
-    if uptime is None:
-        uptime = best_uptime(endpoints, "uptime_last_30m")
+    uptime = current_uptime(endpoints)
     if uptime is None or uptime >= STABLE_UPTIME:
         return STATUS_AVAILABLE
     return STATUS_UNSTABLE

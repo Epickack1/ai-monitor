@@ -7,6 +7,7 @@ from monitor import (
     STATUS_UNSTABLE,
     best_uptime,
     count_working,
+    current_uptime,
     find_in_catalog,
     format_uptime,
     get_model_status,
@@ -49,6 +50,13 @@ def test_status_available_without_uptime_data() -> None:
 def test_best_uptime_ignores_failed_providers() -> None:
     endpoints = [provider(-2, 100.0), provider(0, 80.0)]
     assert best_uptime(endpoints, "uptime_last_5m") == 80.0
+
+
+def test_current_uptime_falls_back_to_30m() -> None:
+    endpoints = [{"status": 0, "uptime_last_5m": None,
+                  "uptime_last_30m": 88.0}]
+    assert current_uptime(endpoints) == 88.0
+    assert current_uptime(None) is None
 
 
 def test_count_working() -> None:

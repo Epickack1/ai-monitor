@@ -1,12 +1,21 @@
 """AIMonitor — мониторинг доступности моделей ИИ в OpenRouter."""
 
 from config import load_api_key
+from history import (
+    add_record,
+    collect_stats,
+    iter_records,
+    last_record,
+    make_record,
+    sort_models,
+)
 from monitor import (
     STATUS_AVAILABLE,
     STATUS_DOWN,
     STATUS_UNSTABLE,
     best_uptime,
     count_working,
+    current_uptime,
     find_in_catalog,
     format_uptime,
     get_model_status,
@@ -15,10 +24,18 @@ from monitor import (
     search_models,
 )
 from openrouter import fetch_catalog, fetch_endpoints, send_test_prompt
-from storage import add_model, load_watchlist, remove_model, save_watchlist
-from utils import input_int, input_str, input_yes_no
+from storage import (
+    add_model,
+    load_history,
+    load_watchlist,
+    remove_model,
+    save_history,
+    save_watchlist,
+)
+from utils import input_int, input_int_range, input_str, input_yes_no
 
 SEARCH_LIMIT = 15
+HISTORY_LIMIT = 10
 
 
 def print_model_summary(model: dict, endpoints: list[dict] | None) -> str:
@@ -52,7 +69,24 @@ def print_providers(endpoints: list[dict]) -> None:
     print()
 
 
-def check_all(models: list[dict]) -> None:
+def record_check(
+    history: list[dict],
+    model_id: str,
+    endpoints: list[dict] | None,
+    status: str,
+) -> None:
+    """Добавить результат проверки модели в историю."""
+    record = make_record(model_id, status, current_uptime(endpoints))
+    add_record(history, record)
+
+
+def save_history_or_warn(history: list[dict]) -> None:
+    """Сохранить историю и сообщить, если это не удалось."""
+    if not save_history(history):
+        print("  Не удалось сохранить историю проверок.")
+
+
+def check_all(models: list[dict], history: list[dict]) -> None:
     """Проверить все отслеживаемые модели и вывести сводку."""
     print("\n=== Проверка всех моделей ===\n")
     if not models:
@@ -61,7 +95,9 @@ def check_all(models: list[dict]) -> None:
 
     available = unstable = down = 0
     for model in models:
-        status = print_model_summary(model, fetch_endpoints(model["id"]))
+        endpoints = fetch_endpoints(model["id"])
+        status = print_model_summary(model, endpoints)
+        record_check(history, model["id"], endpoints, status)
         if status == STATUS_AVAILABLE:
             available += 1
         elif status == STATUS_UNSTABLE:
@@ -73,6 +109,7 @@ def check_all(models: list[dict]) -> None:
         f"Итого: доступно {available} из {len(models)},"
         f" нестабильно {unstable}, недоступно {down}."
     )
+    save_history_or_warn(history)
 
 
 def choose_model(models: list[dict]) -> dict | None:
@@ -92,28 +129,51 @@ def choose_model(models: list[dict]) -> dict | None:
     return None
 
 
-def check_one(models: list[dict]) -> None:
+def check_one(models: list[dict], history: list[dict]) -> None:
     """Подробно проверить одну модель: статус и все её провайдеры."""
     model = choose_model(models)
     if model is None:
         return
     print()
     endpoints = fetch_endpoints(model["id"])
-    print_model_summary(model, endpoints)
+    status = print_model_summary(model, endpoints)
     if endpoints:
         print_providers(endpoints)
+    record_check(history, model["id"], endpoints, status)
+    save_history_or_warn(history)
 
 
-def list_models(models: list[dict]) -> None:
-    """Вывести список отслеживаемых моделей без проверки."""
+def describe_last_check(history: list[dict], model_id: str) -> str:
+    """Текст о последней проверке модели для вывода в списке."""
+    record = last_record(history, model_id)
+    if record is None:
+        return "ещё не проверялась"
+    uptime = format_uptime(record["uptime"])
+    return f"{record['status']}, {uptime} ({record['checked_at']})"
+
+
+def list_models(models: list[dict], history: list[dict]) -> None:
+    """Вывести список отслеживаемых моделей в выбранном порядке."""
     print("\n=== Отслеживаемые модели ===\n")
     if not models:
         print("  Список пуст.\n")
         return
+
+    print("Порядок: 1 — как добавлены, 2 — по названию,"
+          " 3 — по аптайму последней проверки")
+    order = input_int_range("Выберите порядок: ", 1, 3)
+    if order == 2:
+        models = sort_models(models, history)
+    elif order == 3:
+        models = sort_models(models, history, by_uptime=True)
+
+    print()
     for model in models:
-        label = " [бесплатная]" if model["id"].endswith(":free") else ""
+        label = " [бесплатная]" if is_free(model) else ""
         print(f"  {model['name']}{label}")
         print(f"    id: {model['id']}")
+        last_check = describe_last_check(history, model["id"])
+        print(f"    Последняя проверка: {last_check}")
     print()
 
 
@@ -198,6 +258,46 @@ def live_test(models: list[dict]) -> None:
         print(f"  Ошибка через {elapsed} мс: {text}")
 
 
+def show_stats(history: list[dict]) -> None:
+    """Вывести статистику доступности моделей по истории проверок."""
+    print("\n=== Статистика доступности ===\n")
+    stats = collect_stats(history)
+    if not stats:
+        print("  История пуста. Сначала проверьте модели (пункт 1 или 2).")
+        return
+
+    print(f"Всего проверок: {len(history)}, моделей: {len(stats)}\n")
+    print("  Модель                               Проверок  Доступна"
+          "  Ср. аптайм")
+    for item in stats:
+        name = item["model_id"][:36]
+        percent = f"{item['percent']:.0f}%"
+        avg_uptime = format_uptime(item["avg_uptime"])
+        print(f"  {name:<36} {item['checks']:>8}  {percent:>8}"
+              f"  {avg_uptime:>10}")
+
+    print(f"\nСамая стабильная: {stats[0]['model_id']}")
+    if len(stats) > 1:
+        print(f"Самая проблемная: {stats[-1]['model_id']}")
+
+
+def show_model_history(models: list[dict], history: list[dict]) -> None:
+    """Вывести последние проверки выбранной модели."""
+    model = choose_model(models)
+    if model is None:
+        return
+    records = list(iter_records(history, model["id"]))
+    if not records:
+        print("\n  Модель ещё не проверялась.")
+        return
+
+    print(f"\nПоследние проверки {model['id']}:")
+    for record in records[-HISTORY_LIMIT:]:
+        uptime = format_uptime(record["uptime"])
+        print(f"  {record['checked_at']}  {record['status']:<12} {uptime}")
+    print(f"  Всего проверок: {len(records)}")
+
+
 def print_menu() -> None:
     """Вывести главное меню."""
     print("\n=== AIMonitor ===\n")
@@ -208,12 +308,15 @@ def print_menu() -> None:
     print("5. Добавить модель в отслеживание")
     print("6. Удалить модель из отслеживания")
     print("7. Живой тест модели (нужен API-ключ)")
+    print("8. Статистика доступности")
+    print("9. История проверок модели")
     print("0. Выход\n")
 
 
 def main() -> None:
     """Точка запуска приложения."""
     models = load_watchlist()
+    history = load_history()
     catalog: list[dict] = []
 
     while True:
@@ -221,11 +324,11 @@ def main() -> None:
         choice = input("Выберите действие: ").strip()
 
         if choice == "1":
-            check_all(models)
+            check_all(models, history)
         elif choice == "2":
-            check_one(models)
+            check_one(models, history)
         elif choice == "3":
-            list_models(models)
+            list_models(models, history)
         elif choice == "4":
             search_catalog(catalog)
         elif choice == "5":
@@ -234,6 +337,10 @@ def main() -> None:
             remove_from_watchlist(models)
         elif choice == "7":
             live_test(models)
+        elif choice == "8":
+            show_stats(history)
+        elif choice == "9":
+            show_model_history(models, history)
         elif choice == "0":
             print("\nДо свидания!")
             break
@@ -242,4 +349,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print("\n\nРабота прервана. До свидания!")

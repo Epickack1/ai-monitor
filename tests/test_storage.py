@@ -28,6 +28,19 @@ def test_load_broken_json_returns_empty(tmp_path) -> None:
     assert load_watchlist(str(path)) == []
 
 
+def test_load_skips_invalid_models(tmp_path) -> None:
+    path = str(tmp_path / "watchlist.json")
+    good = {"id": "a/b", "name": "Model B"}
+    save_watchlist([good, {"id": "a/c"}, "мусор"], path)
+    assert load_watchlist(path) == [good]
+
+
+def test_load_not_a_list_returns_empty(tmp_path) -> None:
+    path = tmp_path / "watchlist.json"
+    path.write_text('{"id": "a/b"}', encoding="utf-8")
+    assert load_watchlist(str(path)) == []
+
+
 def test_add_model_rejects_duplicates() -> None:
     models = []
     assert add_model(models, "a/b", "Model B")
