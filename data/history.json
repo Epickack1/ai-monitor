@@ -82,5 +82,11 @@
     "status": "Доступна",
     "uptime": 100,
     "checked_at": "2026-09-26 01:29"
+  },
+  {
+    "model_id": "deepseek/deepseek-chat",
+    "status": "Доступна",
+    "uptime": 100,
+    "checked_at": "2026-09-26 01:45"
   }
 ]

@@ -1,9 +1,11 @@
 """Запросы к открытому API OpenRouter."""
 
 import json
-import time
 import urllib.error
 import urllib.request
+
+from models import AIModel, Provider
+from utils import timed
 
 API_URL = "https://openrouter.ai/api/v1"
 USER_AGENT = "AIMonitor/1.0"
@@ -46,29 +48,32 @@ def get_json(path: str) -> dict | None:
         return None
 
 
-def fetch_catalog() -> list[dict]:
+def fetch_catalog() -> list[AIModel]:
     """Загрузить каталог всех моделей OpenRouter."""
     data = get_json("/models")
     if data is None:
         return []
-    return data.get("data", [])
+    return [AIModel.from_api(item) for item in data.get("data", [])]
 
 
-def fetch_endpoints(model_id: str) -> list[dict] | None:
-    """Загрузить список провайдеров модели с их статусом и аптаймом.
+def fetch_providers(model_id: str) -> list[Provider] | None:
+    """Загрузить провайдеров модели с их статусом и аптаймом.
 
     Возвращает None, если модель не найдена или сеть недоступна.
     """
     data = get_json(f"/models/{model_id}/endpoints")
     if data is None:
         return None
-    return data.get("data", {}).get("endpoints", [])
+    endpoints = data.get("data", {}).get("endpoints", [])
+    return [Provider.from_api(endpoint) for endpoint in endpoints]
 
 
-def send_test_prompt(model_id: str, api_key: str) -> tuple[bool, str, int]:
-    """Отправить модели короткий запрос и замерить время ответа.
+@timed
+def send_test_prompt(model_id: str, api_key: str) -> tuple[bool, str]:
+    """Отправить модели короткий запрос.
 
-    Возвращает тройку: успешно ли, текст результата, время в миллисекундах.
+    Возвращает пару: успешно ли и текст результата. Благодаря декоратору
+    timed вызов возвращает ещё и время ответа: ((успех, текст), мс).
     """
     body = {
         "model": model_id,
@@ -85,24 +90,20 @@ def send_test_prompt(model_id: str, api_key: str) -> tuple[bool, str, int]:
         },
         method="POST",
     )
-    started = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             answer = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        elapsed = int((time.perf_counter() - started) * 1000)
-        return False, f"{exc.code}: {describe_http_error(exc.code)}", elapsed
+        return False, f"{exc.code}: {describe_http_error(exc.code)}"
     except (urllib.error.URLError, TimeoutError):
-        elapsed = int((time.perf_counter() - started) * 1000)
-        return False, "нет ответа от сервера", elapsed
+        return False, "нет ответа от сервера"
 
-    elapsed = int((time.perf_counter() - started) * 1000)
     if "error" in answer:
-        return False, answer["error"].get("message", "ошибка модели"), elapsed
+        return False, answer["error"].get("message", "ошибка модели")
 
     choices = answer.get("choices") or [{}]
     message = choices[0].get("message") or {}
     text = (message.get("content") or "").strip()
     if not text and message.get("reasoning"):
         text = "(ответ ушёл в рассуждения модели, лимит токенов исчерпан)"
-    return True, text or "(пустой ответ)", elapsed
+    return True, text or "(пустой ответ)"
